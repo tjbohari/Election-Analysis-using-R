@@ -1,0 +1,370 @@
+---
+title: "Election Analysis for 2016, 2020"
+author: "Taha Juzer Husain"
+date: "14/03/2021"
+output: 
+  html_document: 
+    fig_height: 5
+---
+
+# Introduction
+In this report, we analyze results of elections in Ireland in 2016 and 2020. We represent different graphics to understand how parties performed in the two years and which party gained or lost more votes over time. 
+
+```{r,echo=FALSE, message=FALSE}
+# loading libraries and reading data
+library(readxl)
+
+GalwayWest_2020 <- read_excel("GalwayWest-2020.xlsx", col_names = T, skip = 1)
+GalwayWest_2020$Party <- GalwayWest_2020$...2 
+GalwayWest_2020 <- GalwayWest_2020[-c(2)]
+
+GalwayWest_2016 <- read.csv("2016-04-28_general-election-count-details-galway-west-csv_en.csv")
+```
+
+
+```{r,echo=FALSE, message=FALSE}
+## data wrangling is performed and generated new data frame which will be required for the plot in the future
+## data from different year are manipulated differently and merged afterwards
+
+library(tidyverse)
+votes_per_party_2016 = GalwayWest_2016 %>% filter(Count.Number == 1) %>%
+  group_by(Party) %>% mutate(votes_per_party = sum(Total.Votes), year = "2016")  %>% select(Party, votes_per_party, year) 
+votes_per_party_2016 <- unique(votes_per_party_2016[c("Party", "votes_per_party", "year")])
+
+votes_per_party_2020 = GalwayWest_2020 %>% filter(is.na(GalwayWest_2020$Party) != T) %>% group_by(Party) %>% mutate(votes_per_party = sum(`Count 1`), year = "2020") %>% select(Party, votes_per_party, year)
+votes_per_party_2020 <- unique(votes_per_party_2020[c("Party", "votes_per_party", "year")])
+
+all_votes = rbind(votes_per_party_2016, votes_per_party_2020)
+
+## changing party names to make them consistent with both years data
+all_votes$Party[c(1, 19)] = "Solidarity–PBP"
+all_votes$Party[c(3, 11)] = "Fianna Fail"
+all_votes$Party[c(4, 14)] = "Fine Gael"
+all_votes$Party[c(6, 12)] = "Independent"
+all_votes$Party[c(9, 15)] = "Social Democratic Party"
+all_votes$Party[c(10, 13)] = "Sinn Fein"
+
+```
+
+## Vote Counts per party for 2016 and 2020
+
+Figure 1 represents the vote counts for different parties for year 2016 and 2020. The plot uses grouped bars to represent each party for different years. It also presents the change in votes from 2016 and 2020. According to the figure, Independent party's vote has increased over the years, while some other parties faced reduction in vote over the time.
+
+### Design Decisions
+
+- Grouped bar plots are used to show vote count for different years
+- color codes are used for different years
+- The plot uses *Okabi and Ito's* palette, so the colors could be distinct for user's with CVD.
+- *Tufte lines* are used so users could connect each bar with the y axis.
+
+```{r,echo=FALSE, message=FALSE, fig.height=4}
+## using color palette from Okabi and Ito's palette for CVD users
+library(colorspace)
+cbPalette <- desaturate(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 0.25)
+
+## creating a grouped bar plot using ggplot2 
+plot1 = ggplot(all_votes, (aes(x= reorder(Party, -votes_per_party), y=votes_per_party, fill=year))) + 
+ geom_col(position="dodge") +
+  scale_y_continuous(
+    breaks = seq(0, 17500, 2500),
+    expand = c(0, 0)) +
+scale_fill_manual(values = cbPalette[c(8,6)]) +
+  labs(caption = "Fig.1: Vote counts per party for year 2016 and 2020")+
+  ggtitle("Vote count per party for Galway West") +
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.title = element_text(size=9),
+      
+      panel.background=element_blank(),
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      panel.grid.major.y = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position= c(0.92, 0.82),
+      legend.text = element_text(size = 6), # legend text  was a little large
+      legend.key.size = unit(0.7, "lines"), # legend key size was a little large
+      legend.title = element_text(size =10),
+        plot.caption = element_text(hjust = 0))# legend title  was a little large)  
+plot1
+```
+
+\newpage
+
+## Vote count plot for CVD users
+
+Below figure represents the grouped bar graphs for CVD vision. The plot uses CVD friendly colors which help CVD users  to see the colors distinctly.
+
+```{r,echo=FALSE, message=FALSE, fig.height=5}
+## plotting above plot for CVD users
+library(colorblindr)
+cvd_grid(plot1)
+```
+
+\newpage
+
+## Change in vote from 2016 - 2020
+
+Figure 2 represents the change in votes for parties from 2016 to 2020. The directions of the dots clearly gives the idea, if the party vote increased from 2016 to 2020 or decreased. 
+
+### Design Decisions
+
+- A diverging plot is used to how the difference in votes from year 2016 to 2020.
+- The plot uses CVD friendly colors. 
+- The plot helps users to understand easily if the votes were increased or decreased depending on the direction of the dot. 
+- A bar graph could be used, but it would be unnecessary to use and we can save space on the plot. 
+```{r,echo=FALSE, message=F, message=FALSE}
+## creating a data frame with the difference in votes for parties from 2016 to 2020 
+## taking unique parties and taking difference between the votes
+dif = data.frame()
+party_unique = unique(all_votes$Party)
+for (i in party_unique){
+  temp = all_votes %>% filter(Party == i) %>% arrange(year) %>% mutate(differ = votes_per_party[1] - votes_per_party[2], Part = i, change = ifelse(differ > 0, TRUE, FALSE)) %>% select(differ, Part, change)
+dif = rbind.data.frame(dif, temp)
+}
+dif = unique(dif[c("Part", "differ", "change")])
+dif = filter(dif, !is.na(differ))
+```
+
+```{r,echo=FALSE, message=FALSE}
+## dot plot to show difference between the votes from 2016 to 2020
+theme_set(theme_classic())
+ggplot(dif, aes(x=differ, y=Part, colour = change)) +
+        geom_segment(aes(x = 0, y = Part, xend = differ, yend = Part), size = 0.6, color = "darkgrey") +
+        geom_point(size =2.5) +
+  
+  ggtitle("Change in vote from 2016 - 2020 for Galway West")+
+  labs(caption = "Fig.2: Change in vote from 2016 - 2020 for Galway West")+
+   scale_colour_manual(values= cbPalette[c(7,4)], name = "") +
+  
+  scale_x_continuous(limits = c(-3000, 5000),
+                     expand = c(0, 0),
+                     breaks = seq(-3000,5000, by = 1000),
+                     name = "") +
+  theme(axis.line.y = element_blank(),
+        panel.grid.major.x = element_line(size=0.04, colour = "grey50"),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_blank(),
+    legend.position = "None",
+    axis.title.x = element_text(size = 9),
+     plot.caption = element_text(hjust = 0))
+```
+
+
+```{r,echo=FALSE, message=FALSE}
+## reading data for national and creating data frames for different years
+## data is modified and percentage is calculated for each party and merged the data frames  
+
+results_2016 <- read_excel("results-2016.xlsx")
+results_2020 <- read_excel("results-2020.xlsx")
+
+national_2016 <- results_2016 %>% rename(Party = `2016 election result`) %>% mutate(votes_percentage = round((Votes / sum(Votes)) * 100, 2), election_type = "National Average") %>% select(Party, votes_percentage, election_type)
+
+votes_per_party_2016$votes_percentage = round(votes_per_party_2016$votes_per_party / sum(votes_per_party_2016$votes_per_party) * 100, 2)
+votes_per_party_2016$election_type = "Galway West"
+
+galway_2016 = votes_per_party_2016 %>% select(Party, votes_percentage, election_type)
+
+comparision_2016 = rbind.data.frame(national_2016, galway_2016)
+
+## party names are made consistent for the plot
+
+comparision_2016$Party[c(1, 25)] = "Fine Gael"
+comparision_2016$Party[c(2, 24)] = "Fianna Fail"
+comparision_2016$Party[c(3, 31)] = "Sinn Fein"
+comparision_2016$Party[c(4, 28)] = "Labour Party"
+comparision_2016$Party[c(5, 22)] = "AAA–PbP"
+comparision_2016$Party[c(12, 23)] = "Direct Democracy Ireland"
+comparision_2016$Party[c(9, 26)] = "Green Party"
+comparision_2016$Party[c(19, 27)] = "Independent Alliance"
+comparision_2016$Party[c(19, 27)] = "Independent Alliance"
+comparision_2016$Party[c(4, 28)] = "Labour Party"
+comparision_2016$Party[c(10, 29)] = "Renua Ireland"
+comparision_2016$Party[c(8, 30)] = "Social Democratic Party"
+
+
+national_2020 <- results_2020 %>% rename(Party = `2020 election result`) %>% mutate(votes_percentage = round((Votes / sum(Votes)) * 100, 2), election_type = "National Average") %>% select(Party, votes_percentage, election_type)
+
+votes_per_party_2020$votes_percentage = round(votes_per_party_2020$votes_per_party / sum(votes_per_party_2020$votes_per_party) * 100, 2)
+votes_per_party_2020$election_type = "Galway West"
+
+galway_2020 = votes_per_party_2020 %>% select(Party, votes_percentage, election_type)
+
+comparision_2020 = rbind.data.frame(national_2020, galway_2020)
+
+comparision_2020$Party[c(1, 22)] = "Sinn Fein"
+comparision_2020$Party[c(3, 23)] = "Fine Gael"
+comparision_2020$Party[c(2, 20)] = "Fianna Fail"
+
+comparision_2020$Party[c(5, 26)] = "Labour Party"
+comparision_2020$Party[c(7, 28)] = "Solidarity–PBP"
+
+comparision_2020$Party[c(4, 25)] = "Green Party"
+comparision_2020$Party[c(19, 21)] = "Independent"
+comparision_2020$Party[c(5, 26)] = "Labour Party"
+comparision_2020$Party[c(6, 24)] = "Social Democratic Party"
+
+```
+
+\newpage
+
+## Comparing performance for parties at national and Galway region for 2016
+
+The data for performance at national level was obtained from www.tcd.ie/Political_Science website.
+
+Figure 3 represents comparison between the performance of a party at national level and regional level for 2016. The length of line between the two points represent the difference between the percentage of the party to the total votes for regional and national level. If the line between points is small it shows there was a small difference between percentages of regional and national level. Some parties do not have records for regional and this causes a single point representing percentage of national level.
+
+### Design Decisions
+
+- A dot plot is used for combining and compare different party's performance at regional and national level.
+- Colors are CVD user friendly.
+- Different colors are used to represent different regions.
+
+```{r,echo=FALSE, message=FALSE}
+## creating dot plot for comparing 2016 parties at national and Galway region
+
+ggplot(comparision_2016, aes(x=votes_percentage, y =reorder(Party, -votes_percentage))) +
+  geom_line(aes(group = Party), colour = "grey", size=0.5) +
+   geom_point(size = 3, aes(colour=election_type), alpha = 0.8) +
+   scale_colour_manual(values= cbPalette[c(3,4)], name = "")+
+    ggtitle("Comparison : Galway West - National Average (2016)") + 
+  xlab("Percentage of votes for party to the total votes") + 
+  labs(caption = "Fig.3: Comparison : Galway West - National Average (2016)")+
+  theme(axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.02, colour = "grey50"),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title = element_text(size = 10),
+      legend.position= c(0.92, 0.95),
+      legend.text = element_text(size = 7), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_blank(),
+     plot.caption = element_text(hjust = 0))# legend keys were a little large
+
+```
+
+\newpage
+
+## Comparing performance for parties at national and Galway region for 2020
+
+Figure 4 represents comparison between the performance of a party at national level and regional level for the year 2020. The points represent percentage of vote for the party from the total votes. The length of line between the two points represent the difference between regional and national level.
+
+### Design Decisions
+
+- A dot plot is used to show the difference between the percentages.
+- Length of line between the points could give an idea of the difference
+- The two colors represent region and national average.
+
+```{r,echo=FALSE, message=FALSE}
+## creating dot plot for comparing 2020 parties at national and Galway region
+
+ggplot(comparision_2020, aes(x=votes_percentage, y =reorder(Party, -votes_percentage))) +
+    geom_line(aes(group = Party), colour = "grey", size=0.5) +
+   geom_point(size = 3, aes(colour=election_type), alpha = 0.8) +
+   scale_colour_manual(values=  cbPalette[c(3,4)], name = "")+
+  scale_x_continuous(limits = c(0, 30),
+                     expand = c(0, 1),
+                     breaks = seq(0,30, by = 5)) +
+    
+  ggtitle("Comparison : Galway West - National Average (2020)") + 
+  xlab("Percentage of votes for party to the total votes") + 
+  labs(caption = "Fig.4: Comparison : Galway West - National Average (2020)")+
+  theme(axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.02, colour = "grey50"), # using light grey gridlines for better readabilty
+      panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+      legend.position= c(0.92, 0.95),
+      legend.text = element_text(size = 7), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_blank(),# legend keys were a little large
+     plot.caption = element_text(hjust = 0))
+
+```
+
+\newpage
+
+## Significant candidate change from 2016 to 2020
+
+Below plot represents change in votes for significant candidates from 2016 to 2020. Significant candidates are chosen by the criteria that took part in election for both 2016 and 2020 showing consistency of the candidates. There are 5 candidates who participated in elections for 2016 and 2020. The dot plot represents difference in votes from 2016 to 2020. Only one candidate received more votes in 2020 as compared to 2016.
+
+### Design Decisions
+
+- A diverging plot is used to show the difference between candidate's performance from 2016 to 2020
+- Different colors are used for positive and negative values
+- The direction of dots gives a clear idea, if the candidate performed better in 2020 or not.
+```{r,,echo=FALSE, message=F}
+## creating a data frame with the difference in votes for significant candidates from 2016 to 2020 
+## taking candidates who are consistent in 2016 and 2020 
+
+## filtering data based on count 1 and cleaning the data for further use.
+g_2016 = GalwayWest_2016 %>% filter(Count.Number == 1) %>% mutate("Candidate" = paste0(Candidate.First.Name, " ", Candidate.surname), "Year" = 2016, "Votes" = Total.Votes) %>% select(Votes, Party, Candidate, Year)
+
+g_2020 = GalwayWest_2020 %>% filter(is.na(Candidate) == F)  %>% mutate("Year" = 2020, "Votes" = `Count 1`) %>% select(Votes, Party, Candidate, Year)
+
+significant_cand = rbind.data.frame(g_2016, g_2020)
+
+significant_cand$Candidate[c(3, 21)] = "Éamon O'Cuív"
+significant_cand$Candidate[c(8, 26)] = "Sean Kyne"
+significant_cand$Candidate[c(15, 24)] = "Catherine Connolly"
+significant_cand$Candidate[c(19, 27)] = "Niall O' Tuathail"
+
+candidate_list = c("Catherine Connolly", "Éamon O'Cuív", "Hildegarde Naughton", "Mike Cubbard", "Niall O' Tuathail")
+
+sig = data.frame()
+
+for (i in candidate_list){
+temp = significant_cand %>% filter(Candidate == i) %>% arrange(Year) %>% mutate(differ = Votes[1] - Votes[2], Candidate = i, change = ifelse(differ > 0, TRUE, FALSE)) %>% select(differ, Candidate, change)
+sig = rbind.data.frame(sig, temp)
+
+}
+
+```
+
+```{r,echo=FALSE, message=FALSE}
+## creating a dot plot for change in vote using the difference between votes
+ggplot(sig, aes(x=differ, y=Candidate, colour = change)) +
+        geom_segment(aes(x = 0, y = Candidate, xend = differ, yend = Candidate), size = 0.6, color = "darkgrey") +
+        geom_point(size =3) +
+   scale_colour_manual(values= cbPalette[c(7,4)], name = "") +
+  
+  scale_x_continuous(limits = c(-1250, 1500),
+                     expand = c(0, 1),
+                     breaks = seq(-1250,1250, by = 250)) +
+  ggtitle("Change in vote for significant candidates from 2016 to 2020")+
+  labs(caption = "Fig.5: Change in vote for significant candidates from 2016 to 2020")+
+  theme(axis.line.y = element_blank(),
+        panel.grid.major.x = element_line(size=0.04, colour = "grey50"),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    legend.position = "None",
+    plot.caption = element_text(hjust = 0))
+
+```
+
+## Refrences
+- Lecture Notes
+- GGPLOT Notes
+- www.tcd.ie/Political_Science
+
+\newpage
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+
